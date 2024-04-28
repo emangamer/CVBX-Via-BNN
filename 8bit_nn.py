@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import numpy as np
 
-class BinaryNN(nn.Module):
-    def __init__(self):
-        super(BinaryNN, self).__init__()
-        self.linear1 = nn.Linear(8, 16)
+class BoundingBoxNN(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(BoundingBoxNN, self).__init__()
+        self.linear1 = nn.Linear(input_size, hidden_size)
         self.relu = nn.ReLU()
-        self.linear2 = nn.Linear(16, 8)
+        self.linear2 = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
         x = self.linear1(x)
@@ -15,78 +16,75 @@ class BinaryNN(nn.Module):
         x = self.linear2(x)
         return x
 
-# convert a digit to an 8-bit binary representation
-def encode_digit(digit): return [int(b) for b in '{:08b}'.format(digit)]
-# convert an 8-bit binary representation back to a digit
-def decode_digit(binary): return int(''.join(str(int(b)) for b in binary), 2)
+def generate_dataset(num_samples, num_vertices, holdout_ratio=0.2):
+    # Generate random Gaussian splat data
+    gaussian_data = np.random.normal(0, 1, (num_samples, num_vertices))
 
-# generate dataset with holdout digits not trained on for testing generalisation
-def generate_dataset(holdout_digits):
-    train_dataset = []
-    test_dataset = []
-    for digit in range(256):  # 0 to 255 for 8-bit representation
-        next_digit = (digit + 1) % 256
-        binary = encode_digit(digit)
-        next_binary = encode_digit(next_digit)
-        if digit in holdout_digits:
-            test_dataset.append((digit, binary, next_binary))
-        else:
-            train_dataset.append((binary, next_binary))
-    return train_dataset, test_dataset
+    # Generate random bounding box parameters
+    bounding_boxes = np.random.rand(num_samples, 6)  # [x, y, z, width, height, depth]
 
-def train_network(NeuralNetwork, dataset, epochs=100, learning_rate=0.1):
+    # Split the dataset into training and testing sets
+    train_size = int(num_samples * (1 - holdout_ratio))
+    train_gaussian_data = gaussian_data[:train_size]
+    train_bounding_boxes = bounding_boxes[:train_size]
+    test_gaussian_data = gaussian_data[train_size:]
+    test_bounding_boxes = bounding_boxes[train_size:]
+
+    return train_gaussian_data, train_bounding_boxes, test_gaussian_data, test_bounding_boxes
+
+def train_network(model, train_gaussian_data, train_bounding_boxes, epochs=100, learning_rate=0.01):
     criterion = nn.MSELoss()
-    optimizer = optim.SGD(NeuralNetwork.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
     for epoch in range(epochs):
         total_loss = 0
-        for input_binary, target_binary in dataset:
-            input_tensor = torch.tensor(input_binary, dtype=torch.float32)
-            target_tensor = torch.tensor(target_binary, dtype=torch.float32)
+        for gaussian_data, bounding_box in zip(train_gaussian_data, train_bounding_boxes):
+            gaussian_data_tensor = torch.tensor(gaussian_data, dtype=torch.float32)
+            bounding_box_tensor = torch.tensor(bounding_box, dtype=torch.float32)
 
             optimizer.zero_grad()
-            output = NeuralNetwork(input_tensor)
-            loss = criterion(output, target_tensor)
+            output = model(gaussian_data_tensor)
+            loss = criterion(output, bounding_box_tensor)
             loss.backward()
             optimizer.step()
 
             total_loss += loss.item()
 
         if epoch % 10 == 0:
-            print(f'Epoch [{epoch}/{epochs}], Loss: {total_loss/len(dataset):.4f}')
-        
-    print(f'final Loss: {total_loss/len(dataset):.6f}')
+            print(f'Epoch [{epoch}/{epochs}], Loss: {total_loss/len(train_gaussian_data):.4f}')
 
-def threshold_output(output, threshold):
-    return (output >= threshold).float()
+    print(f'Final Loss: {total_loss/len(train_gaussian_data):.6f}')
 
-def test_network(NeuralNetwork, digit):
-    input_binary = encode_digit(digit)
-    input_tensor = torch.tensor(input_binary, dtype=torch.float32)
-
+def test_network(model, test_gaussian_data, test_bounding_boxes):
+    model.eval()
     with torch.no_grad():
-        output = NeuralNetwork(input_tensor)
-    predicted_next_binary = threshold_output(output, 0.5).int().numpy()
-    predicted_next_digit = decode_digit(predicted_next_binary)
+        for gaussian_data, bounding_box in zip(test_gaussian_data, test_bounding_boxes):
+            gaussian_data_tensor = torch.tensor(gaussian_data, dtype=torch.float32)
 
-    print(f'network output: {output}')
-    print(f" Input Digit: {digit} (Binary: {input_binary})")
-    print(f"Output Digit: {predicted_next_digit} (Binary: {predicted_next_binary.tolist()})")
+            output = model(gaussian_data_tensor)
+            predicted_bounding_box = output.numpy()
 
-holdout_digits = [7,64,93,129,167,185,203]  # Don't train on these digits, they will be the test dataset
+            print("Gaussian Splat Data:")
+            print(gaussian_data)
+            print("Predicted Bounding Box:")
+            print(predicted_bounding_box)
+            print("Actual Bounding Box:")
+            print(bounding_box)
+            print("---")
 
-print('generating dataset')
-train_dataset, test_dataset = generate_dataset(holdout_digits)
+# Set the parameters for the dataset and model
+num_samples = 1000
+num_vertices = 100
+input_size = num_vertices
+hidden_size = 256
+output_size = 6  # Bounding box parameters: [x, y, z, width, height, depth]
 
-print('training network')
-NeuralNetwork = BinaryNN()
-train_network(NeuralNetwork, train_dataset)
+# Generate the dataset
+train_gaussian_data, train_bounding_boxes, test_gaussian_data, test_bounding_boxes = generate_dataset(num_samples, num_vertices)
 
-print('network ready')
-print('-------------')
-print(f'numbers not trained on: {", ".join(str(digit) for digit in holdout_digits)}')
+# Create and train the model
+model = BoundingBoxNN(input_size, hidden_size, output_size)
+train_network(model, train_gaussian_data, train_bounding_boxes)
 
-while True:
-    test_digit = input('number to test:')
-    if test_digit == 'q':
-        break
-    test_network(NeuralNetwork, int(test_digit))
+# Test the model
+test_network(model, test_gaussian_data, test_bounding_boxes)
