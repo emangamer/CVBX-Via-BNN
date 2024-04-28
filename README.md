@@ -1,11 +1,13 @@
-<h1>Binary based neural network</h1>
+<h1>Unreal Engine Vertex Bounding Box Gaussian Trainer</h1>
 
-<h3>Experimenting with binary embeddings</h3>
+<h1>Uses Binary based neural network by Moon</h1>
 
-This is a tiny network trained on '8-hot' binary encoded embeddings.  
+<h3>No human skill- Just Claude Opus regurgitation</h3>
 
-It's trained on a number and itself plus one. The model should return whatever number you give it plus one.  
+Using Moon's tiny network trained on '8-hot' binary encoded embeddings.  
 
-Overall it seems to work quite well and confidently. It makes some interesting mistakes, things like at points where binary flips (63, 127) it seems to be a bit confused about where to put the new first bit.  
+Due to it's simplicity, I used it for CLaude COnversation to prompt a basic project structure, then I cross reference between conversations in a dual instance format to debug issues
 
-Enjoy.
+<h1>THIS IS AI GENERATED CODE AND SHOULD BE CONSIDERED UNSECURE</h1>
+
+
