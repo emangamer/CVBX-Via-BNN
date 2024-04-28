@@ -4,7 +4,7 @@
 
 <h3>No human skill- Just Claude Opus regurgitation</h3>
 
-Using Moon's tiny network trained on '8-hot' binary encoded embeddings.  
+Using Moon's tiny network trained on '8-hot' binary encoded embeddings as a starting point for Claude code conversation, using a code prompt with compressed ideas allows for Claude to better create a base project.
 
 Due to it's simplicity, I used it for CLaude COnversation to prompt a basic project structure, then I cross reference between conversations in a dual instance format to debug issues
 
